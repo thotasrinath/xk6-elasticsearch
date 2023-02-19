@@ -2,6 +2,9 @@ import xk6_elasticsearch from 'k6/x/elasticsearch';
 
 //ES 7.5.2
 const client = xk6_elasticsearch.newBasicClient(['http://localhost:9200/']);
+
+client.setBatchCount(2000)
+
 export default () => {
 
     let doc = {
@@ -11,7 +14,7 @@ export default () => {
         locale: 'en',
         time: `${new Date(Date.now()).toISOString()}`
     };
-    client.addDocument("test", makeId(15), doc);
+    client.addDocumentToBatch("test", makeId(15), doc);
 }
 
 function makeId(length) {
@@ -25,3 +28,4 @@ function makeId(length) {
     }
     return result;
 }
+

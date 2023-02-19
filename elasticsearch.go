@@ -17,7 +17,8 @@ func init() {
 type ElasticSearch struct{}
 
 type Client struct {
-	client *elasticsearch.Client
+	client  *elasticsearch.Client
+	vusVars *VusVars
 }
 
 func (*ElasticSearch) NewClient(connectionStrings []string, username, password string) interface{} {
@@ -26,26 +27,37 @@ func (*ElasticSearch) NewClient(connectionStrings []string, username, password s
 		Username: username,
 		Password: password}
 
-	es, err := elasticsearch.NewClient(config)
-
-	if err != nil {
-		log.Fatal(err)
-		return err
+	es, i, done := CreateElasticSearchClient(config)
+	if done {
+		return i
 	}
-	return &Client{client: es}
+	return &Client{client: es, vusVars: &VusVars{batch: 500}}
 }
 
 func (*ElasticSearch) NewBasicClient(connectionStrings []string) interface{} {
 
 	config := elasticsearch.Config{Addresses: connectionStrings}
 
+	es, i, done := CreateElasticSearchClient(config)
+	if done {
+		return i
+	}
+	return &Client{client: es, vusVars: &VusVars{batch: 500}}
+}
+
+func (c *Client) SetBatchCount(batch int) {
+	c.vusVars.batch = batch
+
+}
+
+func CreateElasticSearchClient(config elasticsearch.Config) (*elasticsearch.Client, interface{}, bool) {
 	es, err := elasticsearch.NewClient(config)
 
 	if err != nil {
 		log.Fatal(err)
-		return err
+		return nil, err, true
 	}
-	return &Client{client: es}
+	return es, nil, false
 }
 
 func (c *Client) AddDocument(index, docId string, document interface{}) error {

@@ -44,7 +44,7 @@ func (c *Client) AddDocumentToBatch(index, docId string, document interface{}) e
 
 	// Prepare the metadata payload
 	//
-	meta := []byte(fmt.Sprintf(`{ "index" : { "_id" : "%d" } }%s`, docId, "\n"))
+	meta := []byte(fmt.Sprintf(`{ "index" : { "_id" : "%s" } }%s`, docId, "\n"))
 	// fmt.Printf("%s", meta) // <-- Uncomment to see the payload
 
 	// Prepare the data payload: encode article to JSON

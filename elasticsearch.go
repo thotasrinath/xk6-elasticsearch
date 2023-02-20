@@ -17,8 +17,17 @@ func init() {
 type ElasticSearch struct{}
 
 type Client struct {
-	client  *elasticsearch.Client
-	vusVars *VusVars
+	client    *elasticsearch.Client
+	buf       bytes.Buffer
+	res       *esapi.Response
+	err       error
+	raw       map[string]interface{}
+	blk       *bulkResponse
+	numItems  int
+	numErrors int
+	currBatch int
+	count     int
+	batch     int
 }
 
 func (*ElasticSearch) NewClient(connectionStrings []string, username, password string) interface{} {
@@ -31,7 +40,13 @@ func (*ElasticSearch) NewClient(connectionStrings []string, username, password s
 	if done {
 		return i
 	}
-	return &Client{client: es, vusVars: &VusVars{batch: 500}}
+
+	client := &Client{client: es, batch: 500}
+
+	cClients := GetElasticClients()
+	cClients.clients = append(cClients.clients, client)
+
+	return client
 }
 
 func (*ElasticSearch) NewBasicClient(connectionStrings []string) interface{} {
@@ -42,11 +57,16 @@ func (*ElasticSearch) NewBasicClient(connectionStrings []string) interface{} {
 	if done {
 		return i
 	}
-	return &Client{client: es, vusVars: &VusVars{batch: 500}}
+	client := &Client{client: es, batch: 500}
+
+	cClients := GetElasticClients()
+	cClients.clients = append(cClients.clients, client)
+
+	return client
 }
 
 func (c *Client) SetBatchCount(batch int) {
-	c.vusVars.batch = batch
+	c.batch = batch
 
 }
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"log"
 )
 
@@ -25,19 +24,6 @@ type bulkResponse struct {
 			} `json:"error"`
 		} `json:"index"`
 	} `json:"items"`
-}
-
-type VusVars struct {
-	buf       bytes.Buffer
-	res       *esapi.Response
-	err       error
-	raw       map[string]interface{}
-	blk       *bulkResponse
-	numItems  int
-	numErrors int
-	currBatch int
-	count     int
-	batch     int
 }
 
 func (c *Client) AddDocumentToBatch(index, docId string, document interface{}) error {
@@ -67,14 +53,14 @@ func (c *Client) AddDocumentToBatch(index, docId string, document interface{}) e
 
 	// Append payloads to the buffer (ignoring write errors)
 	//
-	c.vusVars.buf.Grow(len(meta) + len(data))
-	c.vusVars.buf.Write(meta)
-	c.vusVars.buf.Write(data)
+	c.buf.Grow(len(meta) + len(data))
+	c.buf.Write(meta)
+	c.buf.Write(data)
 
-	c.vusVars.count++
-	c.vusVars.numItems++
+	c.count++
+	c.numItems++
 
-	if c.vusVars.count > 0 && c.vusVars.count%c.vusVars.batch == 0 {
+	if c.count > 0 && c.count%c.batch == 0 {
 		//fmt.Printf("[%d/%d] ", c.vusVars.currBatch, c.vusVars.numBatches)
 
 		err2, done := BulkIndexDocuments(index, c)
@@ -86,56 +72,61 @@ func (c *Client) AddDocumentToBatch(index, docId string, document interface{}) e
 	return nil
 }
 
-func (c *Client) FlushAndCloseBatch(index string) error {
+func (*ElasticSearch) FlushRemOnBatch(index string) error {
 
 	log.Printf("Teardown invoked")
 
-	if c.vusVars.count > 0 {
-		err2, done := BulkIndexDocuments(index, c)
-		if done {
-			return err2
+	clients := GetElasticClients().clients
+
+	for _, c := range clients {
+		if c.count > 0 {
+			err2, done := BulkIndexDocuments(index, c)
+			if done {
+				return err2
+			}
 		}
+
 	}
 
 	return nil
 }
 
 func BulkIndexDocuments(index string, c *Client) (error, bool) {
-	res, err := c.client.Bulk(bytes.NewReader(c.vusVars.buf.Bytes()), c.client.Bulk.WithIndex(index))
-	c.vusVars.res = res
+	res, err := c.client.Bulk(bytes.NewReader(c.buf.Bytes()), c.client.Bulk.WithIndex(index))
+	c.res = res
 	//log.Printf("object is : " + fmt.Sprintf("%p", &c.vusVars))
 	if err != nil {
-		log.Fatalf("Failure indexing batch %d: %s", c.vusVars.currBatch, err)
+		log.Fatalf("Failure indexing batch %d: %s", c.currBatch, err)
 		return err, true
 	}
 	// If the whole request failed, print error and mark all documents as failed
 	//
-	if c.vusVars.res.IsError() {
-		c.vusVars.numErrors += c.vusVars.numItems
-		if err := json.NewDecoder(c.vusVars.res.Body).Decode(&c.vusVars.raw); err != nil {
+	if c.res.IsError() {
+		c.numErrors += c.numItems
+		if err := json.NewDecoder(c.res.Body).Decode(&c.raw); err != nil {
 			log.Fatalf("Failure to to parse response body: %s", err)
 			return err, true
 		} else {
 			log.Printf("  Error: [%d] %s: %s",
-				c.vusVars.res.StatusCode,
-				c.vusVars.raw["error"].(map[string]interface{})["type"],
-				c.vusVars.raw["error"].(map[string]interface{})["reason"],
+				c.res.StatusCode,
+				c.raw["error"].(map[string]interface{})["type"],
+				c.raw["error"].(map[string]interface{})["reason"],
 			)
 			return err, true
 		}
 		// A successful response might still contain errors for particular documents...
 		//
 	} else {
-		if err := json.NewDecoder(c.vusVars.res.Body).Decode(&c.vusVars.blk); err != nil {
+		if err := json.NewDecoder(c.res.Body).Decode(&c.blk); err != nil {
 			log.Fatalf("Failure to to parse response body: %s", err)
 		} else {
-			for _, d := range c.vusVars.blk.Items {
+			for _, d := range c.blk.Items {
 				// ... so for any HTTP status above 201 ...
 				//
 				if d.Index.Status > 201 {
 					// ... increment the error counter ...
 					//
-					c.vusVars.numErrors++
+					c.numErrors++
 
 					// ... and print the response status and error information ...
 					log.Printf("  Error: [%d]: %s: %s: %s: %s",
@@ -154,13 +145,16 @@ func BulkIndexDocuments(index string, c *Client) (error, bool) {
 
 	// Close the response body, to prevent reaching the limit for goroutines or file handles
 	//
-	c.vusVars.res.Body.Close()
+	err1 := c.res.Body.Close()
+	if err1 != nil {
+		return err1, false
+	}
 
 	// Reset the buffer and items counter
 	//
-	c.vusVars.buf.Reset()
-	c.vusVars.numItems = 0
-	c.vusVars.count = 0
-	c.vusVars.currBatch++
+	c.buf.Reset()
+	c.numItems = 0
+	c.count = 0
+	c.currBatch++
 	return nil, false
 }

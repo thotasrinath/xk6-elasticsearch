@@ -3,21 +3,6 @@ import xk6_elasticsearch from 'k6/x/elasticsearch';
 //ES 7.5.2
 const client = xk6_elasticsearch.newBasicClient(['http://localhost:9200/']);
 
-client.setBatchCount(2000)
-
-export const options = {
-    discardResponseBodies: true,
-    scenarios: {
-        contacts: {
-            executor: 'per-vu-iterations',
-            vus: 10,
-            iterations: 400000,
-            // maxDuration: '30s',
-            gracefulStop: '5s',
-        },
-    },
-};
-
 export default () => {
 
     let doc = {
@@ -42,3 +27,7 @@ function makeId(length) {
     return result;
 }
 
+
+export function teardown() {
+    xk6_elasticsearch.flushRemOnBatch("test")
+}

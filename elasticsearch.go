@@ -201,9 +201,9 @@ func (c *Client) AddBatchDocuments(index string, docs map[string]any) error {
 
 	// Close the response body, to prevent reaching the limit for goroutines or file handles
 	//
-	err1 := res.Body.Close()
-	if err1 != nil {
-		return err1
+	err = res.Body.Close()
+	if err != nil {
+		return err
 	}
 
 	// Reset the buffer and items counter

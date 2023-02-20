@@ -3,16 +3,29 @@ import xk6_elasticsearch from 'k6/x/elasticsearch';
 //ES 7.5.2
 const client = xk6_elasticsearch.newBasicClient(['http://localhost:9200/']);
 
+const batchsize = 50;
+
 export default () => {
 
-    let doc = {
+    var docobjs = {}
+
+    for (var i = 0; i < batchsize; i++) {
+        docobjs[makeId(15)] = getRecord();
+    }
+
+    client.addBatchDocuments("test", doc);
+}
+
+function getRecord() {
+    return {
         correlationId: `test--couchbase`,
         title: 'Perf test experiment',
         url: 'example.com',
         locale: 'en',
         time: `${new Date(Date.now()).toISOString()}`
     };
-    client.addDocumentToBatch("test", makeId(15), doc);
+
+
 }
 
 function makeId(length) {
@@ -28,6 +41,3 @@ function makeId(length) {
 }
 
 
-export function teardown() {
-    xk6_elasticsearch.flushRemOnBatch("test")
-}

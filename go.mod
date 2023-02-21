@@ -3,9 +3,7 @@ module github.com/thotasrinath/xk6-elasticsearch
 go 1.20
 
 require (
-	github.com/cenkalti/backoff/v4 v4.2.0
-	github.com/dustin/go-humanize v1.0.1
-	github.com/elastic/go-elasticsearch/v7 v7.17.7
+	github.com/elastic/go-elasticsearch/v8 v8.6.0
 	go.k6.io/k6 v0.42.0
 )
 

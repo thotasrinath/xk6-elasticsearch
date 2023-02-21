@@ -13,7 +13,7 @@ export default () => {
         docobjs[makeId(15)] = getRecord();
     }
 
-    client.addBatchDocuments("test", doc);
+    client.addBatchDocuments("test", docobjs);
 }
 
 function getRecord() {

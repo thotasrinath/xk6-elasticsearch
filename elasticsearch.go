@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 	k6modules "go.k6.io/k6/js/modules"
 	"log"
+	"strconv"
+	"strings"
 )
 
 func init() {
@@ -40,6 +43,24 @@ type BulkResponse struct {
 			} `json:"error"`
 		} `json:"index"`
 	} `json:"items"`
+}
+
+type SearchResults struct {
+	Total int    `json:"total"`
+	Hits  []*Hit `json:"hits"`
+}
+
+// Hit wraps the document returned in search response.
+type Hit struct {
+	types.Document
+	ID         string        `json:"_id"`
+	URL        string        `json:"url"`
+	Sort       []interface{} `json:"sort"`
+	Highlights *struct {
+		Title      []string `json:"title"`
+		Alt        []string `json:"alt"`
+		Transcript []string `json:"transcript"`
+	} `json:"highlights,omitempty"`
 }
 
 func (*ElasticSearch) NewClient(connectionStrings []string, username, password string) interface{} {
@@ -110,7 +131,7 @@ func (c *Client) AddDocument(index, docId string, document interface{}) error {
 			log.Printf("Error parsing the response body: %s", err)
 		} else {
 			// Print the response status and indexed document version.
-			log.Printf("[%s] %s; version=%d", res.Status(), r["result"], int(r["_version"].(float64)))
+			//log.Printf("[%s] %s; version=%d", res.Status(), r["result"], int(r["_version"].(float64)))
 		}
 	}
 
@@ -211,4 +232,85 @@ func (c *Client) AddBatchDocuments(index string, docs map[string]any) error {
 	buf.Reset()
 
 	return nil
+}
+
+func (c *Client) FindOne(index, docId string) (any, error) {
+
+	var resObj interface{}
+
+	req := esapi.GetRequest{Index: index, DocumentID: docId}
+
+	if res, err := req.Do(context.Background(), c.client); err == nil {
+		if err := json.NewDecoder(res.Body).Decode(&resObj); err != nil {
+			log.Fatalf("Failure to to parse response body: %s", err)
+			return resObj, err
+		}
+	} else {
+		return resObj, err
+	}
+
+	return resObj, nil
+}
+
+// Find returns results matching a query, paginated by after.
+func (c *Client) Find(index, query string, size int) (any, error) {
+	var results SearchResults
+
+	res, err := c.client.Search(
+		c.client.Search.WithIndex(index),
+		c.client.Search.WithBody(c.constructQuery(query, size)),
+	)
+	if err != nil {
+		return &results, err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		var e map[string]interface{}
+		if err := json.NewDecoder(res.Body).Decode(&e); err != nil {
+			return &results, err
+		}
+		return &results, fmt.Errorf("[%s] %s: %s", res.Status(), e["error"].(map[string]interface{})["type"], e["error"].(map[string]interface{})["reason"])
+	}
+
+	var r any
+	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+		return &results, err
+	}
+
+	return r, nil
+}
+func (c *Client) constructQuery(q string, size int) *strings.Reader {
+
+	// Build a query string from string passed to function
+	var query = `{"query": {`
+
+	// Concatenate query string with string passed to method call
+	query = query + q
+
+	// Use the strconv.Itoa() method to convert int to string
+	query = query + `}, "size": ` + strconv.Itoa(size) + `}`
+	fmt.Println("\nquery:", query)
+
+	// Check for JSON errors
+	isValid := json.Valid([]byte(query)) // returns bool
+
+	// Default query is "{}" if JSON is invalid
+	if isValid == false {
+		fmt.Println("constructQuery() ERROR: query string not valid:", query)
+		fmt.Println("Using default match_all query")
+		query = "{}"
+	} else {
+		fmt.Println("constructQuery() valid JSON:", isValid)
+	}
+
+	// Build a new string from JSON query
+	var b strings.Builder
+	b.WriteString(query)
+
+	// Instantiate a *strings.Reader object from string
+	read := strings.NewReader(b.String())
+
+	// Return a *strings.Reader object
+	return read
 }

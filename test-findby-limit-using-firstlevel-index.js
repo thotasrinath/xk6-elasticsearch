@@ -3,9 +3,38 @@ import xk6_elasticsearch from 'k6/x/elasticsearch';
 /**
  * Index creation on tradeDate
  *
- * CREATE INDEX `global_myDateIdx`
- *     ON `test` (STR_TO_MILLIS(`tradeDate`))
- *     USING GSI;
+ * curl -X PUT "localhost:9200/test?pretty" -H 'Content-Type: application/json' -d'
+ * {
+ *   "properties": {
+ *     "tradeDate": {
+ *       "type": "date"
+ *     }
+ *   }
+ * }
+ * '
+ *
+ * Range Query for tradeDate firstlevel
+ * {
+ * 	"query": {
+ * 		"bool": {
+ * 			"must": [{
+ * 				"range": {
+ * 					"tradeDate": {
+ * 						"gt": "2010-05-17T07:54:49.139Z",
+ * 						"lt": "2010-05-19T07:54:49.139Z"
+ * 					}
+ * 				}
+ * 			}],
+ * 			"must_not": [],
+ * 			"should": []
+ * 		}
+ * 	},
+ * 	"from": 0,
+ * 	"size": 10,
+ * 	"sort": [],
+ * 	"aggs": {}
+ * }
+ *
  */
 const client = xk6_elasticsearch.newBasicClient(['http://localhost:9200/']);
 export default () => {
@@ -15,7 +44,7 @@ export default () => {
     var endDate = randomDate(startDate, new Date(2022, 0, 1), 0, 24);
 
 
-    var query = '{"query":{"bool":{"must":[{"match":{"tradeDate":"Wed Jun 20 2002 14:41:56 GMT+0800 (+08)"}}],"must_not":[],"should":[]}},"from":0,"size":10,"sort":[],"aggs":{}}'
+    var query = '"bool": { "must": [{ "range": { "tradeDate": { "gt": "' + startDate.toISOString() + '", "lt": "' + endDate.toISOString() + '" } } }], "must_not": [], "should": [] }';
 
     var res = client.find("test", query, 2);
 

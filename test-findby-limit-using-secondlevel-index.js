@@ -1,12 +1,42 @@
-import xk6_couchbase from 'k6/x/couchbase';
-
+import xk6_elasticsearch from 'k6/x/elasticsearch';
 /**
  * Index creation on partyTradeDate
  *
- * CREATE INDEX ix2 ON test (DISTINCT ARRAY (STR_TO_MILLIS(er.meta.partyTradeDate)) FOR er IN trade.party END) USING GSI;
+ * curl -X PUT "localhost:9200/test?pretty" -H 'Content-Type: application/json' -d'
+ * {
+ *   "properties": {
+ *     "partyTradeDate": {
+ *       "type": "date"
+ *     }
+ *   }
+ * }
+ * '
+ *
+ * Range Query for partyTradeDate secondlevel
+ *
+ * {
+ * 	"query": {
+ * 		"bool": {
+ * 			"must": [{
+ * 				"range": {
+ * 					"trade.party.meta.partyTradeDate": {
+ * 						"gt": "2000-05-17T07:54:49.139Z",
+ * 						"lt": "2010-05-30T07:54:49.139Z"
+ * 					}
+ * 				}
+ * 			}],
+ * 			"must_not": [],
+ * 			"should": []
+ * 		}
+ * 	},
+ * 	"from": 0,
+ * 	"size": 10,
+ * 	"sort": [],
+ * 	"aggs": {}
+ * }
  */
 
-const client = xk6_couchbase.newClient('localhost', '<username>', '<password>');
+const client = xk6_elasticsearch.newBasicClient(['http://localhost:9200/']);
 export default () => {
 
     var startDate = randomDate(new Date(2000, 0, 1), new Date(2022, 0, 1), 0, 24);
@@ -14,14 +44,11 @@ export default () => {
     var endDate = randomDate(startDate, new Date(2022, 0, 1), 0, 24);
 
 
-    var query = 'select *\n' +
-        'from test t\n' +
-        'where any v in t.trade.party satisfies STR_TO_MILLIS(v.meta.partyTradeDate) >= STR_TO_MILLIS("'+startDate.toISOString()+'")\n' +
-        '    and STR_TO_MILLIS(v.meta.partyTradeDate) <= STR_TO_MILLIS("'+endDate.toISOString()+'") END limit 10;'
+    var query = '"bool": { "must": [{ "range": { "trade.party.meta.partyTradeDate": { "gt": "' + startDate.toISOString() + '", "lt": "' + endDate.toISOString() + '" } } }], "must_not": [], "should": [] }';
 
-    var res = client.find("test", "_default", query);
+    var res = client.find("test", query, 2);
 
-    //console.log(res);
+    console.log(res);
 }
 
 function randomDate(start, end, startHour, endHour) {
@@ -30,4 +57,3 @@ function randomDate(start, end, startHour, endHour) {
     date.setHours(hour);
     return date;
 }
-

@@ -20,7 +20,7 @@ function randomDate(start, end, startHour, endHour) {
 function getRecord(id) {
     return {
         "docI1d": `${id}`,
-        "tradeDate": `${randomDate(new Date(2000, 0, 1), new Date(2022, 0, 1), 0, 24)}`,
+        "tradeDate": `${randomDate(new Date(2000, 0, 1), new Date(2022, 0, 1), 0, 24).toISOString()}`,
         "meta": {
             "globalKey": "23f3fed9"
         },
@@ -33,7 +33,7 @@ function getRecord(id) {
                     "meta": {
                         "externalKey": "party1",
                         "globalKey": "33f59567",
-                        "partyTradeDate": `${randomDate(new Date(2000, 0, 1), new Date(2022, 0, 1), 0, 24)}`
+                        "partyTradeDate": `${randomDate(new Date(2000, 0, 1), new Date(2022, 0, 1), 0, 24).toISOString()}`
                     },
                     "partyId": [
                         {
@@ -53,7 +53,7 @@ function getRecord(id) {
                     "meta": {
                         "externalKey": "party2",
                         "globalKey": "33f59568",
-                        "partyTradeDate": `${randomDate(new Date(2000, 0, 1), new Date(2022, 0, 1), 0, 24)}`
+                        "partyTradeDate": `${randomDate(new Date(2000, 0, 1), new Date(2022, 0, 1), 0, 24).toISOString()}`
 
                     },
                     "partyId": [

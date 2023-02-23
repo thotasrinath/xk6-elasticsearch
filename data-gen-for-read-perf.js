@@ -1,12 +1,13 @@
 import xk6_elasticsearch from 'k6/x/elasticsearch';
+import exec from 'k6/execution';
 
-//ES 7.5.2
-var count = 0;
 const client = xk6_elasticsearch.newBasicClient(['http://localhost:9200/']);
+
 export default () => {
 
-    client.addDocument("test",count.toString(), getRecord(count.toString()));
-    count++;
+    var docId= exec.scenario.iterationInTest;
+
+    client.addDocument("test", docId.toString(), getRecord(docId.toString()));
 }
 
 function randomDate(start, end, startHour, endHour) {

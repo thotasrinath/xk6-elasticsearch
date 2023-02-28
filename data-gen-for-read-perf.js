@@ -1,7 +1,7 @@
 import xk6_elasticsearch from 'k6/x/elasticsearch';
 import exec from 'k6/execution';
 
-const client = xk6_elasticsearch.newBasicClient(['http://localhost:9200/']);
+const client = xk6_elasticsearch.newBasicClient(['http://172.17.0.2:9200/']);
 
 export default () => {
 

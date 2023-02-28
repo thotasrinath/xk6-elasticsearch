@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"strconv"
+	"strings"
+
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 	k6modules "go.k6.io/k6/js/modules"
-	"log"
-	"strconv"
-	"strings"
 )
 
 func init() {
@@ -122,16 +123,13 @@ func (c *Client) AddDocument(index, docId string, document interface{}) error {
 		return err
 	}
 	if res.IsError() {
-		log.Printf("[%s] Error indexing document ID=%d", res.Status())
+		log.Printf("[%s] Error indexing document ID=%s", res.Status(), docId)
 		return err
 	} else {
 		// Deserialize the response into a map.
 		var r map[string]interface{}
 		if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
 			log.Printf("Error parsing the response body: %s", err)
-		} else {
-			// Print the response status and indexed document version.
-			//log.Printf("[%s] %s; version=%d", res.Status(), r["result"], int(r["_version"].(float64)))
 		}
 	}
 
@@ -153,7 +151,7 @@ func (c *Client) AddBatchDocuments(index string, docs map[string]any) error {
 		//
 		data, err := json.Marshal(document)
 		if err != nil {
-			log.Fatalf("Cannot encode article %d: %s", docId, err)
+			log.Fatalf("Cannot encode article %s: %s", docId, err)
 		}
 
 		// Append newline to the data payload
@@ -213,8 +211,6 @@ func (c *Client) AddBatchDocuments(index string, docs map[string]any) error {
 						d.Index.Error.Cause.Type,
 						d.Index.Error.Cause.Reason,
 					)
-				} else {
-
 				}
 			}
 		}
@@ -290,18 +286,16 @@ func (c *Client) constructQuery(q string, size int) *strings.Reader {
 
 	// Use the strconv.Itoa() method to convert int to string
 	query = query + `}, "size": ` + strconv.Itoa(size) + `}`
-	fmt.Println("\nquery:", query)
+	//fmt.Println("\nquery:", query)
 
 	// Check for JSON errors
 	isValid := json.Valid([]byte(query)) // returns bool
 
 	// Default query is "{}" if JSON is invalid
-	if isValid == false {
+	if !isValid {
 		fmt.Println("constructQuery() ERROR: query string not valid:", query)
 		fmt.Println("Using default match_all query")
 		query = "{}"
-	} else {
-		fmt.Println("constructQuery() valid JSON:", isValid)
 	}
 
 	// Build a new string from JSON query
@@ -313,4 +307,36 @@ func (c *Client) constructQuery(q string, size int) *strings.Reader {
 
 	// Return a *strings.Reader object
 	return read
+}
+func (c *Client) Update(index, docId string, document interface{}) error {
+
+	data, err := json.Marshal(document)
+	if err != nil {
+		log.Fatalf("Error marshaling document: %s", err)
+		return err
+	}
+
+	req := esapi.UpdateRequest{
+		Index:      index,
+		DocumentID: docId,
+		Body:       bytes.NewReader(data),
+		Refresh:    "true",
+	}
+	res, err := req.Do(context.Background(), c.client)
+	if err != nil {
+		log.Fatalf("Failed to index document %s", err)
+		return err
+	}
+	if res.IsError() {
+		log.Printf("[%s] Error indexing document ID=%s", res, docId)
+		return err
+	} else {
+		// Deserialize the response into a map.
+		var r map[string]interface{}
+		if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+			log.Printf("Error parsing the response body: %s", err)
+		}
+	}
+
+	return nil
 }

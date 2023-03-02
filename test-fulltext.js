@@ -1,4 +1,5 @@
 import xk6_elasticsearch from 'k6/x/elasticsearch';
+import { SharedArray } from 'k6/data';
 /*
 {
     "query": {
@@ -31,24 +32,31 @@ import xk6_elasticsearch from 'k6/x/elasticsearch';
 }
 */
 
-const client = xk6_elasticsearch.newBasicClient(['http://172.17.0.2:9200/']);
+const client = xk6_elasticsearch.newBasicClient(['http://ec2-18-138-235-11.ap-southeast-1.compute.amazonaws.com:9200/']);
+
+const data = new SharedArray('words', function () {
+    // All heavy work (opening and processing big files for example) should be done inside here.
+    // This way it will happen only once and the result will be shared between all VUs, saving time and memory.
+    const f = JSON.parse(open('./words_dictionary.json'));
+    return Object.keys(f); // f must be an array
+});
+
+function sentenceGenerator(words, size) {
+    var sentence = '';
+    for (var i = 0; i < size; i++) {
+        sentence += words[Math.floor(Math.random() * words.length)] + ' ';
+    }
+
+    return sentence;
+}
+
 export default () => {
 
-    var startDate = randomDate(new Date(2000, 0, 1), new Date(2022, 0, 1), 0, 24);
+    var sentlen = sentenceGenerator(data, 5);
 
-    var endDate = randomDate(startDate, new Date(2022, 0, 1), 0, 24);
-
-
-    var query = '"bool":{"must":[],"must_not":[],"should":[{"match":{"text_sent_150":"pseudocolumellar"}},{"match":{"text_sent_300":"pseudocolumellar"}},{"match":{"text_sent_450":"pseudocolumellar"}}]}';
+    var query = '"bool":{"must":[],"must_not":[],"should":[{"match":{"text_sent_150":"' + sentlen + '"}},{"match":{"text_sent_300":"' + sentlen + '"}},{"match":{"text_sent_450":"' + sentlen + '"}}]}';
 
     var res = client.find("test", query, 2);
 
     console.log(res);
-}
-
-function randomDate(start, end, startHour, endHour) {
-    var date = new Date(+start + Math.random() * (end - start));
-    var hour = startHour + Math.random() * (endHour - startHour) | 0;
-    date.setHours(hour);
-    return date;
 }
